@@ -58,3 +58,5 @@ First verify the master/worker protocol locally. Then build the worker for Andro
 ## Learning note
 
 This is an intentionally small, inspectable first end-to-end system. It is a foundation for later scheduling, authentication, device discovery, tensor operations, and distributed inference, not a production AI cluster.
+
+Please Note that this is still in development and is incomplete and will have several bugs.
