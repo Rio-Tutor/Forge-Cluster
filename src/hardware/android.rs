@@ -1,8 +1,9 @@
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::process::Command;
 
-use super::HardwareInfo;
+use super::{CpuCluster, HardwareInfo};
 
 pub(super) fn detect() -> HardwareInfo {
     HardwareInfo {
@@ -15,6 +16,8 @@ pub(super) fn detect() -> HardwareInfo {
         logical_cores: std::thread::available_parallelism()
             .map(|count| count.get())
             .unwrap_or(1),
+
+        cpu_clusters: detect_cpu_clusters(),
 
         total_ram_mb: detect_ram("MemTotal:"),
         available_ram_mb: detect_ram("MemAvailable:"),
@@ -61,5 +64,78 @@ fn detect_ram(field: &str) -> Option<u64> {
     }
 
     None
+}
+
+fn detect_cpu_clusters() -> Vec<CpuCluster> {
+    let cpu_directory = "/sys/devices/system/cpu";
+
+    let Ok(entries) = fs::read_dir(cpu_directory) else {
+        return Vec::new();
+    };
+
+    let mut clusters: BTreeMap<u32, (usize, Option<u64>)> =
+        BTreeMap::new();
+
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+
+        let Some(cpu_number) = name.strip_prefix("cpu") else {
+            continue;
+        };
+
+        if cpu_number.is_empty()
+            || !cpu_number.chars().all(|character| character.is_ascii_digit())
+        {
+            continue;
+        }
+
+        let topology_path = entry
+            .path()
+            .join("topology/cluster_id");
+
+        let Ok(cluster_value) = fs::read_to_string(topology_path) else {
+            continue;
+        };
+
+        let Ok(cluster_id) = cluster_value.trim().parse::<u32>() else {
+            continue;
+        };
+
+        let frequency_path = entry
+            .path()
+            .join("cpufreq/cpuinfo_max_freq");
+
+        let frequency = fs::read_to_string(frequency_path)
+            .ok()
+            .and_then(|value| value.trim().parse::<u64>().ok());
+
+        clusters
+            .entry(cluster_id)
+            .and_modify(|(count, max_frequency)| {
+                *count += 1;
+
+                if let Some(new_frequency) = frequency {
+                    *max_frequency = Some(
+                        max_frequency
+                            .map_or(new_frequency, |current| {
+                                current.max(new_frequency)
+                            }),
+                    );
+                }
+            })
+            .or_insert((1, frequency));
+    }
+
+    clusters
+        .into_iter()
+        .map(|(cluster_id, (core_count, max_frequency_khz))| {
+            CpuCluster {
+                cluster_id,
+                core_count,
+                max_frequency_khz,
+            }
+        })
+        .collect()
 }
 
