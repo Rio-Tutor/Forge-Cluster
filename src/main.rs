@@ -5,6 +5,7 @@ mod protocol;
 mod registry;
 mod scheduler;
 mod worker;
+mod hardware;
 
 use std::env;
 use std::error::Error;

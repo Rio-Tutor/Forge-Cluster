@@ -12,6 +12,10 @@ use crate::{
 
 pub async fn run_worker(bind_address: &str) -> Result<(), Box<dyn Error>> {
     let listener = TcpListener::bind(bind_address).await?;
+    let hardware = crate::hardware::detect_hardware();
+
+    println!("FORGE WORKER HARDWARE REPORT");
+    println!("{hardware:#?}");
     println!("FORGE WORKER listening on {bind_address}");
 
     loop {
