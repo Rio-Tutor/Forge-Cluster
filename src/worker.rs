@@ -10,7 +10,9 @@ use crate::{
     protocol::{Message, TaskResponse},
 };
 
-pub async fn run_worker(bind_address: &str) -> Result<(), Box<dyn Error>> {
+pub async fn run_worker(
+    bind_address: &str,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
     let listener = TcpListener::bind(bind_address).await?;
     let hardware = crate::hardware::detect_hardware();
 
@@ -30,9 +32,12 @@ pub async fn run_worker(bind_address: &str) -> Result<(), Box<dyn Error>> {
     }
 }
 
-async fn handle_connection(stream: TcpStream) -> Result<(), Box<dyn Error + Send + Sync>> {
+async fn handle_connection(
+    stream: TcpStream,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
     let mut reader = BufReader::new(stream);
     let mut request_line = String::new();
+
     reader.read_line(&mut request_line).await?;
 
     if request_line.is_empty() {
@@ -43,20 +48,26 @@ async fn handle_connection(stream: TcpStream) -> Result<(), Box<dyn Error + Send
 
     let response = match message {
         Message::RunTask(task) => {
-            let result = compute::execute(task.operation);
+            let result = compute::execute(task.operation)
+                .map_err(std::io::Error::other)?;
+
             Message::TaskResult(TaskResponse {
                 task_id: task.task_id,
                 result,
-                worker: "FORGE Android/remote worker".to_string(),
+                worker: "FORGE CPU Worker".to_string(),
             })
         }
+
         Message::TaskResult(_) => {
-            return Err("Worker received a result message instead of a task".into());
+            return Err(
+                "Worker received a result message instead of a task".into()
+            );
         }
     };
 
     let mut encoded = serde_json::to_vec(&response)?;
     encoded.push(b'\n');
+
     reader.get_mut().write_all(&encoded).await?;
 
     Ok(())

@@ -17,6 +17,7 @@ pub struct TaskRequest {
 pub enum Operation {
     Add { a: i64, b: i64 },
     Multiply { a: i64, b: i64 },
+    SumSquares { start: i64, end: i64 },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
