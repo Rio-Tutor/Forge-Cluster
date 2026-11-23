@@ -26,7 +26,7 @@ pub(super) fn detect() -> HardwareInfo {
 fn read_cpu_model() -> Option<String> {
     let contents = fs::read_to_string("/proc/cpuinfo").ok()?;
     for line in contents.lines() {
-        let (key, value) = line.split_once(':')?;
+        let Some((key, value)) = line.split_once(':') else { continue };
         if matches!(key.trim(), "model name" | "Hardware" | "Processor") {
             let value = value.trim();
             if !value.is_empty() {
