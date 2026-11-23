@@ -16,9 +16,54 @@ pub async fn run_worker(
     let listener = TcpListener::bind(bind_address).await?;
     let hardware = crate::hardware::detect_hardware();
 
-    println!("FORGE WORKER HARDWARE REPORT");
-    println!("{hardware:#?}");
-    println!("FORGE WORKER listening on {bind_address}");
+    println!("========================================");
+    println!("          FORGE WORKER REPORT");
+    println!("========================================");
+    println!("Operating system : {}", hardware.operating_system);
+    println!("Device           : {}", hardware.device_model.as_deref().unwrap_or("Not detected"));
+    println!("Processor        : {}", hardware.cpu_model.as_deref().unwrap_or("Not detected"));
+    println!("Architecture     : {}", hardware.architecture);
+    println!("Logical cores    : {}", hardware.logical_cores);
+
+    if let Some(total_ram) = hardware.total_ram_mb {
+        println!("Total memory     : {:.2} GB", total_ram as f64 / 1024.0);
+    } else {
+        println!("Total memory     : Not detected");
+    }
+
+    if let Some(available_ram) = hardware.available_ram_mb {
+        println!("Available memory : {:.2} GB", available_ram as f64 / 1024.0);
+    } else {
+        println!("Available memory : Not detected");
+    }
+
+    if let Some(soc) = hardware.soc_model.as_deref() {
+        println!("SoC              : {soc}");
+    }
+    if let Some(version) = hardware.android_version.as_deref() {
+        println!("Android version : {version}");
+    }
+    if let Some(gpu) = hardware.gpu_egl.as_deref() {
+        println!("GPU (EGL)        : {gpu}");
+    }
+    if let Some(gpu) = hardware.gpu_vulkan.as_deref() {
+        println!("GPU (Vulkan)     : {gpu}");
+    }
+
+    if hardware.cpu_clusters.is_empty() {
+        println!("CPU clusters     : Not available");
+    } else {
+        println!("CPU clusters:");
+        for cluster in &hardware.cpu_clusters {
+            let frequency = cluster.max_frequency_khz
+                .map(|value| format!("{:.2} GHz", value as f64 / 1_000_000.0))
+                .unwrap_or_else(|| "frequency unknown".to_string());
+            println!("  - Cluster {}: {} cores, {}", cluster.cluster_id, cluster.core_count, frequency);
+        }
+    }
+
+    println!("========================================");
+    println!("Worker listening at: {bind_address}");
 
     loop {
         let (stream, peer) = listener.accept().await?;
