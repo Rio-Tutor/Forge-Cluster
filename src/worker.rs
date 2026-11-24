@@ -27,7 +27,7 @@ pub async fn run_worker(
             let worker_port = listener.local_addr()?.port();
             let (master, advertised) = discovery::discover_master(worker_port).await?;
             discovered = (master.to_string(), advertised.to_string());
-            (discovered.0.as_str(), discovered.1.as_str())
+            (discovered.0.clone(), discovered.1.clone())
         }
         _ => return Err("Provide both master and advertised worker addresses, or neither for automatic discovery".into()),
     };
