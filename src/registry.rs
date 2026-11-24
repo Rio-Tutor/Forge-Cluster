@@ -37,7 +37,7 @@ impl DeviceRegistry {
         &self.workers
     }
 
-    pub fn worker_addresses(&self) -> Vec<String> {
+    pub fn get_worker_addresses(&self) -> Vec<String> {
         self.workers
             .iter()
             .map(|worker| worker.task_address.clone())
