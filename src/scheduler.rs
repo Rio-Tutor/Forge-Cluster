@@ -15,13 +15,16 @@ pub async fn run_sum_squares(
     if workers.is_empty() { return Err("No workers provided".into()); }
     if limit < 1 || chunk_size < 1 { return Err("Limit and chunk size must be positive".into()); }
 
-    let max_score = workers.iter().map(|w| w.benchmark_score).max().unwrap_or(1).max(1);
+    let effective_score = |worker: &WorkerRegistration| {
+        (worker.benchmark_score.max(1) as u128) * (worker.hardware.logical_cores.max(1) as u128)
+    };
+    let max_score = workers.iter().map(effective_score).max().unwrap_or(1).max(1);
     let mut weighted_workers = Vec::new();
     for worker in &workers {
-        let weight = ((worker.benchmark_score.max(1) as f64 / max_score as f64) * 8.0)
+        let weight = ((effective_score(worker) as f64 / max_score as f64) * 8.0)
             .ceil().clamp(1.0, 8.0) as usize;
         for _ in 0..weight { weighted_workers.push(worker.task_address.clone()); }
-        println!("Worker {} score={} weight={weight}", worker.worker_name, worker.benchmark_score);
+        println!("Worker {} score={} iterations/sec × {} cores, weight={weight}", worker.worker_name, worker.benchmark_score, worker.hardware.logical_cores);
     }
 
     let mut assignments = Vec::new();
