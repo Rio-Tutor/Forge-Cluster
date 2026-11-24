@@ -1,4 +1,5 @@
 mod compute;
+mod discovery;
 mod device;
 mod network;
 mod protocol;
@@ -53,10 +54,12 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
             println!("  forge master [registration-bind-ip:port]");
             println!("    Master commands: list | sum-squares <limit> <chunk-size> | quit");
             println!("  forge worker [bind-ip:port] [master-ip:port advertised-worker-ip:port]");
+            println!("    Omit master and advertised addresses to use automatic LAN discovery.");
             println!();
             println!("Example:");
             println!("  forge master 0.0.0.0:7879");
-            println!("  forge worker 0.0.0.0:7878 <master-ip>:7879 <worker-ip>:7878");
+            println!("  forge worker 0.0.0.0:7878");
+            println!("  (Manual mode is also available by supplying both addresses.)");
         }
     }
 
