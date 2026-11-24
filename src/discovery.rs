@@ -64,7 +64,9 @@ pub async fn broadcast_master(
 /// Determine the local IPv4 address used by the default network interface.
 pub async fn local_ipv4_address() -> Result<IpAddr, Box<dyn Error + Send + Sync>> {
     let socket = UdpSocket::bind("0.0.0.0:0").await?;
-    socket.connect("255.255.255.255:7877").await?;
+    // A UDP connect to a unicast documentation address selects the default
+    // route without sending a packet or requiring broadcast-socket permission.
+    socket.connect("192.0.2.1:9").await?;
     let address = socket.local_addr()?.ip();
     if address.is_unspecified() || address.is_loopback() {
         return Err("Could not determine a usable LAN IPv4 address".into());
