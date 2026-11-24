@@ -10,6 +10,7 @@ use tokio::{
 };
 
 use crate::{
+    discovery,
     protocol::{
         Message, RegistrationResponse, TaskRequest, TaskResponse, WorkerRegistration,
     },
@@ -67,12 +68,21 @@ pub async fn run_master(
     bind_address: &str,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let listener = TcpListener::bind(bind_address).await?;
+    let master_port: u16 = bind_address.rsplit_once(':')
+        .and_then(|(_, port)| port.parse().ok())
+        .ok_or("Master bind address must include a valid TCP port")?;
+    tokio::spawn(async move {
+        if let Err(error) = discovery::broadcast_master(master_port).await {
+            eprintln!("FORGE discovery service stopped: {error}");
+        }
+    });
     let registry = Arc::new(Mutex::new(DeviceRegistry::new()));
 
     println!("========================================");
     println!("             FORGE MASTER");
     println!("========================================");
     println!("Worker registration listening at: {bind_address}");
+    println!("LAN discovery beacon: UDP 7877");
     println!();
     println!("Commands:");
     println!("  list");
