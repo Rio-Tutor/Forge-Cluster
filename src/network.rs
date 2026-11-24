@@ -14,6 +14,7 @@ use crate::{
         Message, RegistrationResponse, TaskRequest, TaskResponse, WorkerRegistration,
     },
     registry::DeviceRegistry,
+    scheduler,
 };
 
 pub async fn send_task(
@@ -24,7 +25,7 @@ pub async fn send_task(
     let message = Message::RunTask(task);
 
     let mut encoded = serde_json::to_vec(&message)?;
-    encoded.push(b'\n');
+    encoded.push(b'\\n');
     stream.write_all(&encoded).await?;
 
     let mut reader = BufReader::new(stream);
@@ -47,7 +48,7 @@ pub async fn register_worker(
 ) -> Result<RegistrationResponse, Box<dyn Error + Send + Sync>> {
     let mut stream = TcpStream::connect(master_address).await?;
     let mut encoded = serde_json::to_vec(registration)?;
-    encoded.push(b'\n');
+    encoded.push(b'\\n');
     stream.write_all(&encoded).await?;
 
     let mut reader = BufReader::new(stream);
@@ -61,7 +62,8 @@ pub async fn register_worker(
     Ok(serde_json::from_str(&response_line)?)
 }
 
-pub async fn run_registration_server(
+/// Run the master registration listener and interactive scheduler console.
+pub async fn run_master(
     bind_address: &str,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let listener = TcpListener::bind(bind_address).await?;
@@ -71,18 +73,110 @@ pub async fn run_registration_server(
     println!("             FORGE MASTER");
     println!("========================================");
     println!("Worker registration listening at: {bind_address}");
+    println!();
+    println!("Commands:");
+    println!("  list");
+    println!("  sum-squares <limit> <chunk-size>");
+    println!("  help");
+    println!("  quit");
+    println!();
     println!("Waiting for workers to register...");
 
-    loop {
-        let (stream, peer) = listener.accept().await?;
-        let registry = Arc::clone(&registry);
+    let stdin = tokio::io::stdin();
+    let mut commands = BufReader::new(stdin).lines();
 
-        tokio::spawn(async move {
-            if let Err(error) = handle_registration(stream, registry, &peer.to_string()).await {
-                eprintln!("Registration from {peer} failed: {error}");
+    loop {
+        tokio::select! {
+            accepted = listener.accept() => {
+                let (stream, peer) = accepted?;
+                let registry = Arc::clone(&registry);
+
+                tokio::spawn(async move {
+                    if let Err(error) = handle_registration(
+                        stream,
+                        registry,
+                        &peer.to_string()
+                    ).await {
+                        eprintln!("Registration from {peer} failed: {error}");
+                    }
+                });
             }
-        });
+
+            command = commands.next_line() => {
+                match command? {
+                    Some(line) => {
+                        let mut parts = line.split_whitespace();
+
+                        match parts.next() {
+                            Some("list") => {
+                                let registry = registry.lock().await;
+                                let workers = registry.get_all();
+
+                                if workers.is_empty() {
+                                    println!("No workers are registered yet.");
+                                } else {
+                                    println!("REGISTERED WORKERS: {}", workers.len());
+                                    for (index, worker) in workers.iter().enumerate() {
+                                        println!(
+                                            "{}. {} | {} | {}",
+                                            index + 1,
+                                            worker.worker_name,
+                                            worker.task_address,
+                                            worker.hardware.cpu_model.as_deref().unwrap_or("CPU unknown")
+                                        );
+                                    }
+                                }
+                            }
+
+                            Some("sum-squares") => {
+                                let limit = parts.next().and_then(|value| value.parse::<i64>().ok());
+                                let chunk_size = parts.next().and_then(|value| value.parse::<i64>().ok());
+
+                                match (limit, chunk_size) {
+                                    (Some(limit), Some(chunk_size)) => {
+                                        let worker_addresses = {
+                                            let registry = registry.lock().await;
+                                            registry.get_worker_addresses()
+                                        };
+
+                                        if worker_addresses.is_empty() {
+                                            println!("No registered workers. Start a worker first.");
+                                        } else if let Err(error) = scheduler::run_sum_squares(
+                                            worker_addresses,
+                                            limit,
+                                            chunk_size
+                                        ).await {
+                                            eprintln!("Computation failed: {error}");
+                                        }
+                                    }
+                                    _ => println!("Usage: sum-squares <positive-limit> <positive-chunk-size>"),
+                                }
+                            }
+
+                            Some("help") => {
+                                println!("Available commands:");
+                                println!("  list");
+                                println!("  sum-squares <limit> <chunk-size>");
+                                println!("  help");
+                                println!("  quit");
+                            }
+
+                            Some("quit") | Some("exit") => {
+                                println!("Shutting down FORGE master.");
+                                break;
+                            }
+
+                            Some(other) => println!("Unknown command: {other}. Type 'help'."),
+                            None => {}
+                        }
+                    }
+                    None => break,
+                }
+            }
+        }
     }
+
+    Ok(())
 }
 
 async fn handle_registration(
@@ -153,7 +247,7 @@ async fn handle_registration(
     };
 
     let mut encoded = serde_json::to_vec(&response)?;
-    encoded.push(b'\n');
+    encoded.push(b'\\n');
     reader.get_mut().write_all(&encoded).await?;
 
     Ok(())
