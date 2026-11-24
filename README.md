@@ -146,3 +146,20 @@ Issues and pull requests are welcome. The project is under active development, s
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
+
+
+## Master as a compute node
+
+The master machine contributes CPU compute automatically. Starting `forge master`
+starts both the coordinator and its own compute task server, benchmarks the
+master CPU, and registers the master in the same worker registry used by
+remote devices. Remote workers can then be scheduled alongside the master.
+
+Default ports:
+- TCP `7879`: master registration and heartbeat listener
+- UDP `7877`: LAN discovery beacon
+- TCP `7878`: master compute task server
+
+Do not start a separate worker process on the same machine using the default
+compute port while the master is running. The master already hosts that
+machine's compute worker.
