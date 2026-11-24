@@ -16,6 +16,9 @@ use crate::{
     },
     registry::DeviceRegistry,
     scheduler,
+    compute,
+    hardware,
+    worker,
 };
 
 pub async fn send_task(
@@ -98,7 +101,49 @@ pub async fn run_master(
             eprintln!("FORGE discovery service stopped: {error}");
         }
     });
+    // The master is also a compute node. It runs the same task server as
+    // ordinary workers and registers its own hardware with the scheduler.
+    let master_task_listener = TcpListener::bind("0.0.0.0:7878").await?;
+    let master_task_port = master_task_listener.local_addr()?.port();
+    let master_lan_ip = discovery::local_ipv4_address().await?;
+    let master_task_address = format!("{master_lan_ip}:{master_task_port}");
+    tokio::spawn(async move {
+        if let Err(error) = worker::run_task_server(master_task_listener).await {
+            eprintln!("Master compute server stopped: {error}");
+        }
+    });
+
+    let hardware_info = hardware::detect_hardware();
+    println!("Benchmarking master CPU...");
+    let benchmark_score = compute::benchmark_cpu(500_000);
+    let master_registration = WorkerRegistration {
+        worker_id: format!("master-{}-{master_task_address}", hardware_info.architecture),
+        worker_name: format!("FORGE Master ({})", hardware_info.device_model.as_deref().or(hardware_info.cpu_model.as_deref()).unwrap_or("This machine")),
+        task_address: master_task_address.clone(),
+        benchmark_score,
+        hardware: hardware_info,
+    };
+
     let registry = Arc::new(Mutex::new(DeviceRegistry::new()));
+    let master_worker_id = master_registration.worker_id.clone();
+    {
+        let mut workers = registry.lock().await;
+        workers.register_or_update(master_registration);
+    }
+    println!("Master compute node registered at {master_task_address}");
+    println!("Master CPU benchmark: {benchmark_score} iterations/sec");
+
+    // Keep the local master entry alive using the same liveness mechanism
+    // used for remote workers.
+    let master_heartbeat_registry = Arc::clone(&registry);
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(5));
+        loop {
+            interval.tick().await;
+            master_heartbeat_registry.lock().await.heartbeat(&master_worker_id);
+        }
+    });
+
     let cleanup_registry = Arc::clone(&registry);
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(5));
@@ -123,7 +168,7 @@ pub async fn run_master(
     println!("  help");
     println!("  quit");
     println!();
-    println!("Waiting for workers to register...");
+    println!("Master is contributing compute. Waiting for remote workers...");
 
     let stdin = tokio::io::stdin();
     let mut commands = BufReader::new(stdin).lines();
@@ -184,7 +229,7 @@ pub async fn run_master(
                                         };
 
                                         if workers.is_empty() {
-                                            println!("No registered workers. Start a worker first.");
+                                            println!("No compute nodes are registered.");
                                         } else if let Err(error) = scheduler::run_sum_squares(
                                             workers,
                                             limit,
