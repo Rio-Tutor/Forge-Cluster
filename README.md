@@ -110,7 +110,8 @@ For a worker on the same machine as the master, use `127.0.0.1:7879` and `127.0.
 
 FORGE currently uses TCP:
 
-- Master registration listener: TCP `7879` by default.
+- Master registration and heartbeat listener: TCP `7879` by default.
+- Master discovery beacon: UDP broadcast `7877`.
 - Worker task listener: TCP `7878` by default.
 
 Allow these ports only on the trusted local network, using your operating system's firewall. Do not expose FORGE worker or master ports directly to the public internet.
@@ -122,8 +123,8 @@ Automatic master discovery is implemented using IPv4 UDP broadcast on the local 
 - Worker registrations are held in memory and disappear when the master restarts.
 - Automatic IPv4 LAN master discovery is implemented. UDP broadcast may be blocked by some Wi-Fi networks.
 - Heartbeats and stale-worker expiry are implemented; reconnection to a master at a changed IP is not guaranteed.
-- The scheduler still uses fixed-size chunks; benchmark scores influence assignment weights but do not yet provide live adaptive scheduling.
-- A failed worker task currently fails the overall computation; automatic retries and task recovery are not implemented.
+- The scheduler still uses fixed-size chunks; a startup CPU microbenchmark multiplied by logical core count influences assignment weights, but does not yet provide live adaptive scheduling.
+- Failed tasks are retried up to three attempts with a 20-second timeout. The demonstrated sum-of-squares operation is deterministic and safe to retry; future side-effecting operations will need task deduplication before retries can be generalized.
 - The implemented execution path is CPU-based. GPU fields in hardware profiles are informational only; GPU task execution is not implemented.
 - The current task set is small and experimental; `sum-squares` is the demonstrated distributed workload.
 - No authentication or encryption is implemented. Use only on a trusted, isolated network.
@@ -132,7 +133,7 @@ Automatic master discovery is implemented using IPv4 UDP broadcast on the local 
 ## Roadmap
 
 1. Zero-configuration LAN discovery.
-1. Validate discovery and heartbeat behavior across real networks and operating systems.
+1. Validate discovery, heartbeat, and reconnection behavior across real networks and operating systems.
 2. Dynamic chunk sizing and live workload monitoring.
 3. Stronger task identity and deduplication for safe retries.
 4. Persistent cluster state and richer diagnostics.
