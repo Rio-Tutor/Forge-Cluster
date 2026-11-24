@@ -25,7 +25,7 @@ pub async fn send_task(
     let message = Message::RunTask(task);
 
     let mut encoded = serde_json::to_vec(&message)?;
-    encoded.push(b'\\n');
+    encoded.push(b'\n');
     stream.write_all(&encoded).await?;
 
     let mut reader = BufReader::new(stream);
@@ -48,7 +48,7 @@ pub async fn register_worker(
 ) -> Result<RegistrationResponse, Box<dyn Error + Send + Sync>> {
     let mut stream = TcpStream::connect(master_address).await?;
     let mut encoded = serde_json::to_vec(registration)?;
-    encoded.push(b'\\n');
+    encoded.push(b'\n');
     stream.write_all(&encoded).await?;
 
     let mut reader = BufReader::new(stream);
@@ -247,7 +247,7 @@ async fn handle_registration(
     };
 
     let mut encoded = serde_json::to_vec(&response)?;
-    encoded.push(b'\\n');
+    encoded.push(b'\n');
     reader.get_mut().write_all(&encoded).await?;
 
     Ok(())
