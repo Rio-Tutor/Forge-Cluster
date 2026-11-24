@@ -17,6 +17,18 @@ pub struct WorkerRegistration {
     pub hardware: HardwareInfo,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkerHeartbeat {
+    pub kind: String,
+    pub worker_id: String,
+}
+
+impl WorkerHeartbeat {
+    pub fn new(worker_id: impl Into<String>) -> Self {
+        Self { kind: "heartbeat".into(), worker_id: worker_id.into() }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RegistrationResponse {
     pub accepted: bool,
