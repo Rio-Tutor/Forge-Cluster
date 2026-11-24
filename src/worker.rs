@@ -36,10 +36,14 @@ pub async fn run_worker(
         .or_else(|| hardware.cpu_model.clone())
         .unwrap_or_else(|| "FORGE Worker".to_string());
     let worker_id = format!("{}-{}-{}", hardware.architecture, worker_name.replace(' ', "_"), advertised);
+    println!("Benchmarking CPU...");
+    let benchmark_score = compute::benchmark_cpu(500_000);
+    println!("CPU benchmark: {benchmark_score} iterations/sec");
     let registration = WorkerRegistration {
         worker_id: worker_id.clone(),
         worker_name,
         task_address: advertised.to_string(),
+        benchmark_score,
         hardware: hardware.clone(),
     };
 
