@@ -1,10 +1,26 @@
 use serde::{Deserialize, Serialize};
 
+use crate::hardware::HardwareInfo;
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type", content = "payload")]
 pub enum Message {
     RunTask(TaskRequest),
     TaskResult(TaskResponse),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkerRegistration {
+    pub worker_id: String,
+    pub worker_name: String,
+    pub task_address: String,
+    pub hardware: HardwareInfo,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RegistrationResponse {
+    pub accepted: bool,
+    pub message: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
