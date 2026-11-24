@@ -14,6 +14,8 @@ pub struct WorkerRegistration {
     pub worker_id: String,
     pub worker_name: String,
     pub task_address: String,
+    #[serde(default)]
+    pub benchmark_score: u64,
     pub hardware: HardwareInfo,
 }
 
