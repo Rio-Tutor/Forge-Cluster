@@ -106,7 +106,7 @@ pub async fn run_master(
             interval.tick().await;
             let mut registry = cleanup_registry.lock().await;
             for worker_id in registry.remove_stale(std::time::Duration::from_secs(20)) {
-                println!(\"Worker timed out and was removed: {worker_id}\");
+                println!("Worker timed out and was removed: {worker_id}");
             }
         }
     });
