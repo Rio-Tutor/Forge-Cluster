@@ -64,7 +64,9 @@ pub async fn run_sum_squares(
     let mut total = 0_i64;
     let mut completed = 0_usize;
     while let Some(job) = jobs.join_next().await {
-        let result = job??;
+        let result = job
+            .map_err(std::io::Error::other)?
+            .map_err(std::io::Error::other)?;
         let (address, response) = result;
         total = total.checked_add(response.result).ok_or("Final result overflow")?;
         completed += 1;
