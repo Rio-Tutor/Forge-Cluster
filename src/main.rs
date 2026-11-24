@@ -47,7 +47,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         }
 
         _ => {
-            println!("FORGE v0.2 - distributed worker master");
+            println!("FORGE v0.1.0 - distributed computing prototype");
             println!();
             println!("Usage:");
             println!("  forge master [registration-bind-ip:port]");
@@ -56,7 +56,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
             println!();
             println!("Example:");
             println!("  forge master 0.0.0.0:7879");
-            println!("  forge worker 0.0.0.0:7878 192.168.1.10:7879 192.168.1.20:7878");
+            println!("  forge worker 0.0.0.0:7878 <master-ip>:7879 <worker-ip>:7878");
         }
     }
 
