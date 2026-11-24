@@ -7,14 +7,51 @@ use tokio::{
 
 use crate::{
     compute,
-    protocol::{Message, TaskResponse},
+    network,
+    protocol::{Message, TaskResponse, WorkerRegistration},
 };
 
 pub async fn run_worker(
     bind_address: &str,
+    master_address: Option<&str>,
+    advertised_address: Option<&str>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let listener = TcpListener::bind(bind_address).await?;
     let hardware = crate::hardware::detect_hardware();
+
+    if let (Some(master), Some(advertised)) = (master_address, advertised_address) {
+        let worker_name = hardware
+            .device_model
+            .clone()
+            .or_else(|| hardware.cpu_model.clone())
+            .unwrap_or_else(|| "FORGE Worker".to_string());
+
+        // The address is part of the identity so separate devices can register independently.
+        let worker_id = format!(
+            "{}-{}-{}",
+            hardware.architecture,
+            worker_name.replace(' ', "_"),
+            advertised
+        );
+
+        let registration = WorkerRegistration {
+            worker_id,
+            worker_name,
+            task_address: advertised.to_string(),
+            hardware: hardware.clone(),
+        };
+
+        println!("Registering with FORGE master at {master}...");
+        let response = network::register_worker(master, &registration).await?;
+
+        if !response.accepted {
+            return Err(format!("Master rejected worker registration: {}", response.message).into());
+        }
+
+        println!("Registration successful: {}", response.message);
+    } else {
+        println!("Registration not configured. Running in standalone worker mode.");
+    }
 
     println!("========================================");
     println!("          FORGE WORKER REPORT");
@@ -41,7 +78,7 @@ pub async fn run_worker(
         println!("SoC              : {soc}");
     }
     if let Some(version) = hardware.android_version.as_deref() {
-        println!("Android version : {version}");
+        println!("Android version  : {version}");
     }
     if let Some(gpu) = hardware.gpu_egl.as_deref() {
         println!("GPU (EGL)        : {gpu}");
@@ -64,6 +101,9 @@ pub async fn run_worker(
 
     println!("========================================");
     println!("Worker listening at: {bind_address}");
+    if let Some(address) = advertised_address {
+        println!("Advertised address : {address}");
+    }
 
     loop {
         let (stream, peer) = listener.accept().await?;
