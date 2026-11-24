@@ -52,6 +52,16 @@ pub async fn send_heartbeat(
     let mut encoded = serde_json::to_vec(&heartbeat)?;
     encoded.push(b'\n');
     stream.write_all(&encoded).await?;
+    let mut reader = BufReader::new(stream);
+    let mut response_line = String::new();
+    reader.read_line(&mut response_line).await?;
+    if response_line.is_empty() {
+        return Err("Master closed the connection without a heartbeat response".into());
+    }
+    let response: RegistrationResponse = serde_json::from_str(&response_line)?;
+    if !response.accepted {
+        return Err(response.message.into());
+    }
     Ok(())
 }
 
@@ -230,9 +240,15 @@ async fn handle_registration(
     if value.get("kind").and_then(|v| v.as_str()) == Some("heartbeat") {
         let heartbeat: WorkerHeartbeat = serde_json::from_value(value)?;
         let mut registry = registry.lock().await;
-        if !registry.heartbeat(&heartbeat.worker_id) {
-            eprintln!("Heartbeat from unknown worker: {}", heartbeat.worker_id);
-        }
+        let known = registry.heartbeat(&heartbeat.worker_id);
+        drop(registry);
+        let response = RegistrationResponse {
+            accepted: known,
+            message: if known { "Heartbeat accepted".into() } else { "Worker must register again".into() },
+        };
+        let mut encoded = serde_json::to_vec(&response)?;
+        encoded.push(b'\n');
+        reader.get_mut().write_all(&encoded).await?;
         return Ok(());
     }
 
