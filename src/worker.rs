@@ -123,9 +123,17 @@ pub async fn run_worker(
     println!("Worker listening at: {bind_address}");
     println!("Advertised address : {advertised}");
 
+    run_task_server(listener).await
+}
+
+/// Serve compute requests on an already-bound TCP listener.
+/// The master uses this same task server so it can compute as well.
+pub async fn run_task_server(
+    listener: TcpListener,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
     loop {
         let (stream, peer) = listener.accept().await?;
-        println!("Accepted connection from {peer}");
+        println!("Accepted compute task from {peer}");
 
         tokio::spawn(async move {
             if let Err(error) = handle_connection(stream).await {
