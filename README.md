@@ -2,9 +2,9 @@
 
 **FORGE** is an experimental distributed-computing framework written in Rust. It coordinates a master process and CPU workers across separate devices, including Linux PCs and Android devices.
 
-The current prototype demonstrates hardware profiling, worker registration, TCP task execution, and static round-robin distribution of a sum-of-squares workload across heterogeneous CPU architectures.
+The current prototype includes IPv4 LAN master discovery, hardware profiling, worker registration and heartbeats, offline-worker expiry, CPU benchmarking, benchmark-weighted task distribution, task timeouts, retries, and TCP task execution across heterogeneous CPU architectures.
 
-> **Project status:** experimental developer preview. The v0.1.0 release is a proof of concept, not a production-ready cluster runtime. Automatic discovery, heartbeats, fault tolerance, GPU execution, and performance-aware scheduling are not implemented yet.
+ > **Project status:** experimental developer preview on the development branch. Discovery, heartbeats, basic reconnection, benchmark-weighted scheduling, and bounded task retries are implemented but require cross-device testing. This is not production-ready.
 
 ## Features
 
@@ -12,7 +12,11 @@ The current prototype demonstrates hardware profiling, worker registration, TCP 
 - Worker registration with a hardware profile.
 - Linux and Android hardware detection.
 - CPU task execution through a backend abstraction.
-- Static round-robin chunk assignment across registered worker addresses.
+- CPU throughput benchmark collected during worker startup.
+- Benchmark-weighted chunk assignment across workers.
+- Worker heartbeats every 5 seconds and stale-worker removal after 20 seconds.
+- Worker re-registration when the master stops recognizing its heartbeat.
+- Per-task timeout and up to three attempts.
 - Concurrent task dispatch and result aggregation.
 - Tested proof of concept with a Linux x86_64 PC and an Android ARM64 phone.
 
@@ -116,8 +120,9 @@ Automatic master discovery is implemented using IPv4 UDP broadcast on the local 
 ## Current limitations
 
 - Worker registrations are held in memory and disappear when the master restarts.
-- Automatic IPv4 LAN master discovery is implemented; worker heartbeats, liveness tracking, and reconnection are not.
-- The scheduler uses fixed-size chunks and round-robin assignment.
+- Automatic IPv4 LAN master discovery is implemented. UDP broadcast may be blocked by some Wi-Fi networks.
+- Heartbeats and stale-worker expiry are implemented; reconnection to a master at a changed IP is not guaranteed.
+- The scheduler still uses fixed-size chunks; benchmark scores influence assignment weights but do not yet provide live adaptive scheduling.
 - A failed worker task currently fails the overall computation; automatic retries and task recovery are not implemented.
 - The implemented execution path is CPU-based. GPU fields in hardware profiles are informational only; GPU task execution is not implemented.
 - The current task set is small and experimental; `sum-squares` is the demonstrated distributed workload.
@@ -127,11 +132,11 @@ Automatic master discovery is implemented using IPv4 UDP broadcast on the local 
 ## Roadmap
 
 1. Zero-configuration LAN discovery.
-2. Worker heartbeats, offline detection, and reconnection.
-3. CPU benchmarking and performance-aware scheduling.
-4. Dynamic chunk sizing and workload monitoring.
-5. Task timeouts, retries, and fault tolerance.
-6. Additional compute backends, including GPU support.
+1. Validate discovery and heartbeat behavior across real networks and operating systems.
+2. Dynamic chunk sizing and live workload monitoring.
+3. Stronger task identity and deduplication for safe retries.
+4. Persistent cluster state and richer diagnostics.
+5. Additional compute backends, including GPU support.
 
 ## Contributing
 
