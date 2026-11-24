@@ -46,49 +46,35 @@ Run the development build with `cargo run`, or the optimized binary at `target/r
 
 ## Run a cluster
 
-The examples below use these illustrative addresses:
-
-- PC master: `192.168.1.100`
-- Android worker: `192.168.1.102`
-
-Replace them with the addresses currently assigned by your network.
+The automatic mode uses UDP broadcast discovery on port `7877`. The master advertises its registration port; workers discover the master and determine their own LAN address for task traffic.
 
 ### 1. Start the master
 
 On the PC:
 
 ```bash
-cargo run --release -- master 0.0.0.0:7879
+cargo run --release -- master
 ```
 
-The master listens for worker registrations on TCP port `7879`. Its console supports:
-
-```text
-list
-sum-squares <limit> <chunk-size>
-help
-quit
-```
+The master listens for worker registrations on TCP port `7879` and broadcasts its presence over UDP port `7877`.
 
 ### 2. Start a worker on the PC
 
 In a second terminal on the same PC:
 
 ```bash
-cargo run --release -- worker 0.0.0.0:7878 127.0.0.1:7879 127.0.0.1:7878
+cargo run --release -- worker
 ```
-
-The worker binds its task listener to port `7878`, registers with the local master, and advertises its loopback task address.
 
 ### 3. Start a worker on Android
 
 In Termux:
 
 ```bash
-cargo run --release -- worker 0.0.0.0:7878 192.168.1.100:7879 192.168.1.102:7878
+cargo run --release -- worker
 ```
 
-Replace the master and Android addresses with the actual reachable addresses. The advertised worker address must be reachable **from the master**, because the master opens TCP connections to workers when dispatching tasks.
+Workers search for a FORGE master automatically, then register their detected hardware profile and reachable task address.
 
 ### 4. Check workers and run a task
 
@@ -105,6 +91,17 @@ The master prints task assignments, worker responses, and the aggregated result.
 333333833333500000
 ```
 
+### Manual connection fallback
+
+If UDP broadcast is blocked by the network, you can still provide addresses explicitly:
+
+```bash
+# Worker syntax:
+cargo run --release -- worker 0.0.0.0:7878 <master-ip>:7879 <worker-ip>:7878
+```
+
+For a worker on the same machine as the master, use `127.0.0.1:7879` and `127.0.0.1:7878`.
+
 ## Network and firewall notes
 
 FORGE currently uses TCP:
@@ -114,12 +111,12 @@ FORGE currently uses TCP:
 
 Allow these ports only on the trusted local network, using your operating system's firewall. Do not expose FORGE worker or master ports directly to the public internet.
 
-The current version requires the master and worker addresses to be supplied when starting a registered worker. Automatic LAN discovery and address refresh are planned, but are not part of this release.
+Automatic master discovery is implemented using IPv4 UDP broadcast on the local network. Networks that suppress client broadcasts may require the manual connection fallback. Address refresh, worker heartbeats, and reconnection are not implemented yet.
 
 ## Current limitations
 
 - Worker registrations are held in memory and disappear when the master restarts.
-- No automatic worker discovery, heartbeat, liveness tracking, or reconnection.
+- Automatic IPv4 LAN master discovery is implemented; worker heartbeats, liveness tracking, and reconnection are not.
 - The scheduler uses fixed-size chunks and round-robin assignment.
 - A failed worker task currently fails the overall computation; automatic retries and task recovery are not implemented.
 - The implemented execution path is CPU-based. GPU fields in hardware profiles are informational only; GPU task execution is not implemented.
