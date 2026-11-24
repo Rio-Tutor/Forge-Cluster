@@ -12,7 +12,7 @@ use tokio::{
 use crate::{
     discovery,
     protocol::{
-        Message, RegistrationResponse, TaskRequest, TaskResponse, WorkerRegistration,
+        Message, RegistrationResponse, TaskRequest, TaskResponse, WorkerHeartbeat, WorkerRegistration,
     },
     registry::DeviceRegistry,
     scheduler,
@@ -41,6 +41,18 @@ pub async fn send_task(
         Message::TaskResult(response) => Ok(response),
         Message::RunTask(_) => Err("Worker sent an unexpected task request".into()),
     }
+}
+
+pub async fn send_heartbeat(
+    master_address: &str,
+    worker_id: &str,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let mut stream = TcpStream::connect(master_address).await?;
+    let heartbeat = WorkerHeartbeat::new(worker_id);
+    let mut encoded = serde_json::to_vec(&heartbeat)?;
+    encoded.push(b'\\n');
+    stream.write_all(&encoded).await?;
+    Ok(())
 }
 
 pub async fn register_worker(
@@ -77,6 +89,17 @@ pub async fn run_master(
         }
     });
     let registry = Arc::new(Mutex::new(DeviceRegistry::new()));
+    let cleanup_registry = Arc::clone(&registry);
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(5));
+        loop {
+            interval.tick().await;
+            let mut registry = cleanup_registry.lock().await;
+            for worker_id in registry.remove_stale(std::time::Duration::from_secs(20)) {
+                println!(\"Worker timed out and was removed: {worker_id}\");
+            }
+        }
+    });
 
     println!("========================================");
     println!("             FORGE MASTER");
@@ -202,7 +225,17 @@ async fn handle_registration(
         return Err("Connection closed before registration data arrived".into());
     }
 
-    let registration: WorkerRegistration = serde_json::from_str(&line)?;
+    let value: serde_json::Value = serde_json::from_str(&line)?;
+    if value.get("kind").and_then(|v| v.as_str()) == Some("heartbeat") {
+        let heartbeat: WorkerHeartbeat = serde_json::from_value(value)?;
+        let mut registry = registry.lock().await;
+        if !registry.heartbeat(&heartbeat.worker_id) {
+            eprintln!("Heartbeat from unknown worker: {}", heartbeat.worker_id);
+        }
+        return Ok(());
+    }
+
+    let registration: WorkerRegistration = serde_json::from_value(value)?;
     let validation_error = if registration.worker_id.trim().is_empty()
         || registration.worker_name.trim().is_empty()
         || registration.task_address.trim().is_empty()
