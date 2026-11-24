@@ -58,35 +58,44 @@ pub async fn run_registration_server(
     bind_address: &str,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let listener = TcpListener::bind(bind_address).await?;
-    let mut registered_ids: Vec<String> = Vec::new();
+    let mut registered_workers: Vec<WorkerRegistration> = Vec::new();
 
     println!("========================================");
-    println!("          FORGE MASTER");
+    println!("             FORGE MASTER");
     println!("========================================");
     println!("Worker registration listening at: {bind_address}");
     println!("Waiting for workers to register...");
 
     loop {
         let (stream, peer) = listener.accept().await?;
-        let known_ids = registered_ids.clone();
 
-        match handle_registration(stream, &peer.to_string(), &known_ids).await {
+        match handle_registration(stream).await {
             Ok((registration, response)) => {
                 if response.accepted {
-                    registered_ids.push(registration.worker_id.clone());
-                    println!();
-                    println!("WORKER REGISTERED");
-                    println!("Name       : {}", registration.worker_name);
-                    println!("Worker ID  : {}", registration.worker_id);
-                    println!("Task address: {}", registration.task_address);
-                    println!("Operating system: {}", registration.hardware.operating_system);
-                    println!("Processor  : {}", registration.hardware.cpu_model.as_deref().unwrap_or("Not detected"));
-                    println!("Logical cores: {}", registration.hardware.logical_cores);
-                    if let Some(ram) = registration.hardware.total_ram_mb {
-                        println!("Total memory: {:.2} GB", ram as f64 / 1024.0);
+                    // A reconnect from the same worker refreshes its stored profile.
+                    if let Some(existing) = registered_workers
+                        .iter_mut()
+                        .find(|worker| worker.worker_id == registration.worker_id)
+                    {
+                        *existing = registration.clone();
+                        println!("Worker profile refreshed: {}", registration.worker_name);
+                    } else {
+                        registered_workers.push(registration.clone());
+                        println!("Worker registered: {}", registration.worker_name);
                     }
-                    println!("Connected from: {peer}");
+
+                    println!("Worker ID        : {}", registration.worker_id);
+                    println!("Task address     : {}", registration.task_address);
+                    println!("Operating system : {}", registration.hardware.operating_system);
+                    println!("Processor        : {}", registration.hardware.cpu_model.as_deref().unwrap_or("Not detected"));
+                    println!("Logical cores    : {}", registration.hardware.logical_cores);
+                    if let Some(ram) = registration.hardware.total_ram_mb {
+                        println!("Total memory     : {:.2} GB", ram as f64 / 1024.0);
+                    }
+                    println!("Connected from   : {peer}");
+                    println!("Registered workers: {}", registered_workers.len());
                 }
+
                 println!("Registration response: {}", response.message);
             }
             Err(error) => eprintln!("Registration from {peer} failed: {error}"),
@@ -96,8 +105,6 @@ pub async fn run_registration_server(
 
 async fn handle_registration(
     stream: TcpStream,
-    _peer: &str,
-    known_ids: &[String],
 ) -> Result<(WorkerRegistration, RegistrationResponse), Box<dyn Error + Send + Sync>> {
     let mut reader = BufReader::new(stream);
     let mut line = String::new();
@@ -115,11 +122,6 @@ async fn handle_registration(
         RegistrationResponse {
             accepted: false,
             message: "Worker ID, name, and task address are required".into(),
-        }
-    } else if known_ids.iter().any(|id| id == &registration.worker_id) {
-        RegistrationResponse {
-            accepted: false,
-            message: format!("Worker ID {} is already registered", registration.worker_id),
         }
     } else {
         RegistrationResponse {
