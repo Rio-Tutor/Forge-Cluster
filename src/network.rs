@@ -157,6 +157,7 @@ pub async fn run_master(
                                             worker.task_address,
                                             worker.hardware.cpu_model.as_deref().unwrap_or("CPU unknown")
                                         );
+                                        println!("   CPU benchmark: {} iterations/sec", worker.benchmark_score);
                                     }
                                 }
                             }
@@ -167,15 +168,15 @@ pub async fn run_master(
 
                                 match (limit, chunk_size) {
                                     (Some(limit), Some(chunk_size)) => {
-                                        let worker_addresses = {
+                                        let workers = {
                                             let registry = registry.lock().await;
-                                            registry.get_worker_addresses()
+                                            registry.get_all()
                                         };
 
-                                        if worker_addresses.is_empty() {
+                                        if workers.is_empty() {
                                             println!("No registered workers. Start a worker first.");
                                         } else if let Err(error) = scheduler::run_sum_squares(
-                                            worker_addresses,
+                                            workers,
                                             limit,
                                             chunk_size
                                         ).await {
