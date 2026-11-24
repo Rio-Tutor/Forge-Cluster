@@ -7,6 +7,7 @@ use tokio::{
 
 use crate::{
     compute,
+    discovery,
     network,
     protocol::{Message, TaskResponse, WorkerRegistration},
 };
@@ -19,7 +20,19 @@ pub async fn run_worker(
     let listener = TcpListener::bind(bind_address).await?;
     let hardware = crate::hardware::detect_hardware();
 
-    if let (Some(master), Some(advertised)) = (master_address, advertised_address) {
+    let discovered;
+    let (master, advertised) = match (master_address, advertised_address) {
+        (Some(master), Some(advertised)) => (master.to_string(), advertised.to_string()),
+        (None, None) => {
+            let worker_port = listener.local_addr()?.port();
+            let (master, advertised) = discovery::discover_master(worker_port).await?;
+            discovered = (master.to_string(), advertised.to_string());
+            (discovered.0.as_str(), discovered.1.as_str())
+        }
+        _ => return Err("Provide both master and advertised worker addresses, or neither for automatic discovery".into()),
+    };
+
+    {
         let worker_name = hardware
             .device_model
             .clone()
@@ -49,8 +62,6 @@ pub async fn run_worker(
         }
 
         println!("Registration successful: {}", response.message);
-    } else {
-        println!("Registration not configured. Running in standalone worker mode.");
     }
 
     println!("========================================");
@@ -101,9 +112,7 @@ pub async fn run_worker(
 
     println!("========================================");
     println!("Worker listening at: {bind_address}");
-    if let Some(address) = advertised_address {
-        println!("Advertised address : {address}");
-    }
+    println!("Advertised address : {advertised}");
 
     loop {
         let (stream, peer) = listener.accept().await?;
