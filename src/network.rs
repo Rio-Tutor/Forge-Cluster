@@ -50,7 +50,7 @@ pub async fn send_heartbeat(
     let mut stream = TcpStream::connect(master_address).await?;
     let heartbeat = WorkerHeartbeat::new(worker_id);
     let mut encoded = serde_json::to_vec(&heartbeat)?;
-    encoded.push(b'\\n');
+    encoded.push(b'\n');
     stream.write_all(&encoded).await?;
     Ok(())
 }
