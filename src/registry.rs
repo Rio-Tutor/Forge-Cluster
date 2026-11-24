@@ -1,8 +1,8 @@
-use crate::device::Device;
+use crate::protocol::WorkerRegistration;
 
 #[derive(Default)]
 pub struct DeviceRegistry {
-    devices: Vec<Device>,
+    workers: Vec<WorkerRegistration>,
 }
 
 impl DeviceRegistry {
@@ -10,24 +10,37 @@ impl DeviceRegistry {
         Self::default()
     }
 
-    pub fn register(&mut self, device: Device) -> Result<(), String> {
-        if self.devices.iter().any(|existing| existing.id == device.id) {
-            return Err(format!("Device ID {} is already registered", device.id));
+    /// Add a worker, or refresh its profile when it reconnects.
+    pub fn register_or_update(&mut self, worker: WorkerRegistration) {
+        if let Some(existing) = self
+            .workers
+            .iter_mut()
+            .find(|existing| existing.worker_id == worker.worker_id)
+        {
+            *existing = worker;
+        } else {
+            self.workers.push(worker);
         }
-
-        self.devices.push(device);
-        Ok(())
     }
 
     pub fn count(&self) -> usize {
-        self.devices.len()
+        self.workers.len()
     }
 
-    pub fn get_by_id(&self, id: u32) -> Option<&Device> {
-        self.devices.iter().find(|device| device.id == id)
+    pub fn get_by_id(&self, worker_id: &str) -> Option<&WorkerRegistration> {
+        self.workers
+            .iter()
+            .find(|worker| worker.worker_id == worker_id)
     }
 
-    pub fn get_all(&self) -> &[Device] {
-        &self.devices
+    pub fn get_all(&self) -> &[WorkerRegistration] {
+        &self.workers
+    }
+
+    pub fn worker_addresses(&self) -> Vec<String> {
+        self.workers
+            .iter()
+            .map(|worker| worker.task_address.clone())
+            .collect()
     }
 }
