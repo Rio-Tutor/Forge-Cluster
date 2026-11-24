@@ -30,37 +30,44 @@ pub async fn run_worker(
         _ => return Err("Provide both master and advertised worker addresses, or neither for automatic discovery".into()),
     };
 
-    {
-        let worker_name = hardware
-            .device_model
-            .clone()
-            .or_else(|| hardware.cpu_model.clone())
-            .unwrap_or_else(|| "FORGE Worker".to_string());
+    let worker_name = hardware
+        .device_model
+        .clone()
+        .or_else(|| hardware.cpu_model.clone())
+        .unwrap_or_else(|| "FORGE Worker".to_string());
+    let worker_id = format!("{}-{}-{}", hardware.architecture, worker_name.replace(' ', "_"), advertised);
+    let registration = WorkerRegistration {
+        worker_id: worker_id.clone(),
+        worker_name,
+        task_address: advertised.to_string(),
+        hardware: hardware.clone(),
+    };
 
-        // The address is part of the identity so separate devices can register independently.
-        let worker_id = format!(
-            "{}-{}-{}",
-            hardware.architecture,
-            worker_name.replace(' ', "_"),
-            advertised
-        );
-
-        let registration = WorkerRegistration {
-            worker_id,
-            worker_name,
-            task_address: advertised.to_string(),
-            hardware: hardware.clone(),
-        };
-
-        println!("Registering with FORGE master at {master}...");
-        let response = network::register_worker(&master, &registration).await?;
-
-        if !response.accepted {
-            return Err(format!("Master rejected worker registration: {}", response.message).into());
-        }
-
-        println!("Registration successful: {}", response.message);
+    println!("Registering with FORGE master at {master}...");
+    let response = network::register_worker(&master, &registration).await?;
+    if !response.accepted {
+        return Err(format!("Master rejected worker registration: {}", response.message).into());
     }
+    println!("Registration successful: {}", response.message);
+
+    let heartbeat_master = master.clone();
+    let heartbeat_worker = worker_id.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(5));
+        loop {
+            interval.tick().await;
+            if let Err(error) = network::send_heartbeat(&heartbeat_master, &heartbeat_worker).await {
+                eprintln!("Heartbeat failed; attempting to reconnect: {error}");
+                loop {
+                    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                    if network::register_worker(&heartbeat_master, &registration).await.map(|r| r.accepted).unwrap_or(false) {
+                        println!("Reconnected to FORGE master.");
+                        break;
+                    }
+                }
+            }
+        }
+    });
 
     println!("========================================");
     println!("          FORGE WORKER REPORT");
