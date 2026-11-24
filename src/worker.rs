@@ -20,14 +20,12 @@ pub async fn run_worker(
     let listener = TcpListener::bind(bind_address).await?;
     let hardware = crate::hardware::detect_hardware();
 
-    let discovered;
     let (master, advertised) = match (master_address, advertised_address) {
         (Some(master), Some(advertised)) => (master.to_string(), advertised.to_string()),
         (None, None) => {
             let worker_port = listener.local_addr()?.port();
             let (master, advertised) = discovery::discover_master(worker_port).await?;
-            discovered = (master.to_string(), advertised.to_string());
-            (discovered.0.clone(), discovered.1.clone())
+            (master.to_string(), advertised.to_string())
         }
         _ => return Err("Provide both master and advertised worker addresses, or neither for automatic discovery".into()),
     };
@@ -55,7 +53,7 @@ pub async fn run_worker(
         };
 
         println!("Registering with FORGE master at {master}...");
-        let response = network::register_worker(master, &registration).await?;
+        let response = network::register_worker(&master, &registration).await?;
 
         if !response.accepted {
             return Err(format!("Master rejected worker registration: {}", response.message).into());
