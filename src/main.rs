@@ -1,4 +1,3 @@
-
 mod compute;
 mod device;
 mod network;
@@ -11,9 +10,6 @@ mod hardware;
 use std::env;
 use std::error::Error;
 
-use device::{ConnectionStatus, Device, DeviceRole};
-use registry::DeviceRegistry;
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let arguments: Vec<String> = env::args().collect();
@@ -24,75 +20,44 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
                 .get(2)
                 .map(String::as_str)
                 .unwrap_or("0.0.0.0:7878");
+            let master_address = arguments.get(3).map(String::as_str);
+            let advertised_address = arguments.get(4).map(String::as_str);
 
-            worker::run_worker(bind_address).await?;
-        }
-
-        Some("master") => {
-            let worker_addresses: Vec<String> =
-                arguments.iter().skip(2).cloned().collect();
-
-            if worker_addresses.is_empty() {
+            if master_address.is_some() != advertised_address.is_some() {
                 return Err(
-                    "Usage: forge master <worker1-ip:port> [worker2-ip:port ...]"
+                    "Worker registration requires both <master-ip:port> and <advertised-worker-ip:port>"
                         .into()
                 );
             }
 
-            run_master(&worker_addresses).await?;
+            worker::run_worker(
+                bind_address,
+                master_address,
+                advertised_address,
+            ).await?;
+        }
+
+        Some("master") => {
+            let registration_bind = arguments
+                .get(2)
+                .map(String::as_str)
+                .unwrap_or("0.0.0.0:7879");
+
+            network::run_registration_server(registration_bind).await?;
         }
 
         _ => {
-            println!("FORGE v0.1 - distributed compute prototype");
+            println!("FORGE v0.2 - worker registration prototype");
             println!();
             println!("Usage:");
-            println!("  forge worker [bind-ip:port]");
-            println!("  forge master <worker1-ip:port> [worker2-ip:port ...]");
+            println!("  forge master [registration-bind-ip:port]");
+            println!("  forge worker [bind-ip:port] [master-ip:port advertised-worker-ip:port]");
+            println!();
+            println!("Example:");
+            println!("  forge master 0.0.0.0:7879");
+            println!("  forge worker 0.0.0.0:7878 192.168.1.10:7879 192.168.1.20:7878");
         }
     }
 
     Ok(())
 }
-
-async fn run_master(
-    worker_addresses: &[String],
-) -> Result<(), Box<dyn Error + Send + Sync>> {
-    let mut registry = DeviceRegistry::new();
-
-    registry.register(Device {
-        id: 1,
-        name: "CachyOS PC".into(),
-        processor: "AMD Ryzen 3 3250U with Vega 3".into(),
-        ram_gb: 8,
-        role: DeviceRole::Master,
-        status: ConnectionStatus::Connected,
-    }).map_err(std::io::Error::other)?;
-
-    for (index, address) in worker_addresses.iter().enumerate() {
-        registry.register(Device {
-            id: (index + 2) as u32,
-            name: format!("Worker {}", index + 1),
-            processor: format!("Remote worker at {address}"),
-            ram_gb: 0,
-            role: DeviceRole::Worker,
-            status: ConnectionStatus::Unknown,
-        }).map_err(std::io::Error::other)?;
-    }
-
-    println!("FORGE MASTER");
-    println!("Registered devices: {}", registry.count());
-    println!("Workers: {}", worker_addresses.len());
-
-    for address in worker_addresses {
-        println!("Worker: {address}");
-    }
-
-    scheduler::run_sum_squares(
-        worker_addresses.to_vec(),
-        1_000_000,
-        10_000,
-    ).await?;
-
-    Ok(())
-}
-
