@@ -43,14 +43,15 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
                 .map(String::as_str)
                 .unwrap_or("0.0.0.0:7879");
 
-            network::run_registration_server(registration_bind).await?;
+            network::run_master(registration_bind).await?;
         }
 
         _ => {
-            println!("FORGE v0.2 - worker registration prototype");
+            println!("FORGE v0.2 - distributed worker master");
             println!();
             println!("Usage:");
             println!("  forge master [registration-bind-ip:port]");
+            println!("    Master commands: list | sum-squares <limit> <chunk-size> | quit");
             println!("  forge worker [bind-ip:port] [master-ip:port advertised-worker-ip:port]");
             println!();
             println!("Example:");
