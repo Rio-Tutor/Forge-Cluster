@@ -44,3 +44,52 @@ impl ComputeBackend for CpuBackend {
         }
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::protocol::Operation;
+
+    #[test]
+    fn adds_without_overflow() {
+        let result = CpuBackend.execute(&Operation::Add { a: 20, b: 22 });
+        assert_eq!(result, Ok(42));
+    }
+
+    #[test]
+    fn reports_addition_overflow() {
+        let result = CpuBackend.execute(&Operation::Add { a: i64::MAX, b: 1 });
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn multiplies_without_overflow() {
+        let result = CpuBackend.execute(&Operation::Multiply { a: 7, b: 6 });
+        assert_eq!(result, Ok(42));
+    }
+
+    #[test]
+    fn reports_multiplication_overflow() {
+        let result = CpuBackend.execute(&Operation::Multiply { a: i64::MAX, b: 2 });
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn sums_square_range() {
+        let result = CpuBackend.execute(&Operation::SumSquares { start: 1, end: 3 });
+        assert_eq!(result, Ok(14));
+    }
+
+    #[test]
+    fn rejects_invalid_square_range() {
+        let result = CpuBackend.execute(&Operation::SumSquares { start: 4, end: 3 });
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn reports_square_overflow() {
+        let result = CpuBackend.execute(&Operation::SumSquares { start: i64::MAX, end: i64::MAX });
+        assert!(result.is_err());
+    }
+}
