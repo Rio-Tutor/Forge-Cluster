@@ -116,7 +116,7 @@ FORGE currently uses TCP:
 
 Allow these ports only on the trusted local network, using your operating system's firewall. Do not expose FORGE worker or master ports directly to the public internet.
 
-Automatic master discovery is implemented using IPv4 UDP broadcast on the local network. Networks that suppress client broadcasts may require the manual connection fallback. Address refresh, worker heartbeats, and reconnection are not implemented yet.
+Automatic master discovery is implemented using IPv4 UDP broadcast on the local network. Networks that suppress client broadcasts may require the manual connection fallback. Address refresh after a master IP change is not guaranteed.
 
 ## Current limitations
 
@@ -125,7 +125,7 @@ Automatic master discovery is implemented using IPv4 UDP broadcast on the local 
 - Heartbeats and stale-worker expiry are implemented; reconnection to a master at a changed IP is not guaranteed.
 - The scheduler still uses fixed-size chunks; a startup CPU microbenchmark multiplied by logical core count influences assignment weights, but does not yet provide live adaptive scheduling.
 - Failed tasks are retried up to three attempts with a 20-second timeout. The demonstrated sum-of-squares operation is deterministic and safe to retry; future side-effecting operations will need task deduplication before retries can be generalized.
-- The implemented execution path is CPU-based. GPU fields in hardware profiles are informational only; GPU task execution is not implemented.
+- Vulkan GPU adapter diagnostics are available through `forge gpu-info`. This confirms whether the runtime exposes a Vulkan adapter, but GPU task execution and GPU-aware scheduling are not implemented yet.
 - The current task set is small and experimental; `sum-squares` is the demonstrated distributed workload.
 - No authentication or encryption is implemented. Use only on a trusted, isolated network.
 - Linux and Android hardware detection are implemented. Other operating systems use a generic fallback profile and have not been validated as release targets.
@@ -137,7 +137,8 @@ Automatic master discovery is implemented using IPv4 UDP broadcast on the local 
 2. Dynamic chunk sizing and live workload monitoring.
 3. Stronger task identity and deduplication for safe retries.
 4. Persistent cluster state and richer diagnostics.
-5. Additional compute backends, including GPU support.
+5. Implement and validate a Vulkan compute backend on Linux and Android.
+6. Add GPU benchmarking and CPU/GPU-aware scheduling with safe CPU fallback.
 
 ## Contributing
 
@@ -147,6 +148,16 @@ Issues and pull requests are welcome. The project is under active development, s
 
 Apache-2.0. See [LICENSE](LICENSE).
 
+
+## GPU diagnostics
+
+Run the following command on each device to check whether FORGE can see a Vulkan adapter:
+
+```bash
+cargo run -- gpu-info
+```
+
+This currently reports adapter and compute-limit information only. A detected adapter does not yet mean FORGE can execute distributed tasks on the GPU. GPU execution will be enabled only after the compute backend is implemented and validated on both Linux and Android.
 
 ## Master as a compute node
 
