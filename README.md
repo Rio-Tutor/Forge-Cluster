@@ -19,6 +19,7 @@ The current prototype includes IPv4 LAN master discovery, hardware profiling, wo
 - Per-task timeout and up to three attempts.
 - Concurrent task dispatch and result aggregation.
 - Tested proof of concept with a Linux x86_64 PC and an Android ARM64 phone.
+- Vulkan adapter diagnostics for checking GPU runtime availability on each node.
 
 ## Architecture
 
@@ -132,8 +133,7 @@ Automatic master discovery is implemented using IPv4 UDP broadcast on the local 
 
 ## Roadmap
 
-1. Zero-configuration LAN discovery.
-1. Validate discovery, heartbeat, and reconnection behavior across real networks and operating systems.
+1. Validate discovery, heartbeat, and reconnection behavior across more networks and operating systems.
 2. Dynamic chunk sizing and live workload monitoring.
 3. Stronger task identity and deduplication for safe retries.
 4. Persistent cluster state and richer diagnostics.
