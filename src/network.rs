@@ -26,6 +26,7 @@ pub async fn send_task(
     task: TaskRequest,
 ) -> Result<TaskResponse, Box<dyn Error + Send + Sync>> {
     let mut stream = TcpStream::connect(worker_address).await?;
+    let expected_task_id = task.task_id;
     let message = Message::RunTask(task);
 
     let mut encoded = serde_json::to_vec(&message)?;
@@ -42,14 +43,14 @@ pub async fn send_task(
 
     match serde_json::from_str::<Message>(&response_line)? {
         Message::TaskResult(response) => {
-            if response.task_id != task.task_id {
-                return Err(format!("Task ID mismatch: expected {}, received {}", task.task_id, response.task_id).into());
+            if response.task_id != expected_task_id {
+                return Err(format!("Task ID mismatch: expected {}, received {}", expected_task_id, response.task_id).into());
             }
             Ok(response)
         }
         Message::TaskError(failure) => {
-            if failure.task_id != task.task_id {
-                return Err(format!("Task ID mismatch in failure: expected {}, received {}", task.task_id, failure.task_id).into());
+            if failure.task_id != expected_task_id {
+                return Err(format!("Task ID mismatch in failure: expected {}, received {}", expected_task_id, failure.task_id).into());
             }
             Err(format!("Worker {} rejected task {}: {}", failure.worker, failure.task_id, failure.error).into())
         }
