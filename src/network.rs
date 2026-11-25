@@ -41,7 +41,18 @@ pub async fn send_task(
     }
 
     match serde_json::from_str::<Message>(&response_line)? {
-        Message::TaskResult(response) => Ok(response),
+        Message::TaskResult(response) => {
+            if response.task_id != task.task_id {
+                return Err(format!("Task ID mismatch: expected {}, received {}", task.task_id, response.task_id).into());
+            }
+            Ok(response)
+        }
+        Message::TaskError(failure) => {
+            if failure.task_id != task.task_id {
+                return Err(format!("Task ID mismatch in failure: expected {}, received {}", task.task_id, failure.task_id).into());
+            }
+            Err(format!("Worker {} rejected task {}: {}", failure.worker, failure.task_id, failure.error).into())
+        }
         Message::RunTask(_) => Err("Worker sent an unexpected task request".into()),
     }
 }
