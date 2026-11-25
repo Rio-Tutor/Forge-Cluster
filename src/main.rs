@@ -7,6 +7,7 @@ mod registry;
 mod scheduler;
 mod worker;
 mod hardware;
+mod gpu;
 
 use std::env;
 use std::error::Error;
@@ -38,6 +39,10 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
             ).await?;
         }
 
+        Some("gpu-info") => {
+            gpu::print_vulkan_adapters()?;
+        }
+
         Some("master") => {
             let registration_bind = arguments
                 .get(2)
@@ -51,6 +56,8 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
             println!("FORGE v0.1.0 - distributed computing prototype");
             println!();
             println!("Usage:");
+            println!("  forge gpu-info");
+            println!("    Detect available Vulkan GPU adapters.");
             println!("  forge master [registration-bind-ip:port]");
             println!("    Master commands: list | sum-squares <limit> <chunk-size> | quit");
             println!("  forge worker [bind-ip:port] [master-ip:port advertised-worker-ip:port]");
