@@ -7,6 +7,7 @@ use crate::hardware::HardwareInfo;
 pub enum Message {
     RunTask(TaskRequest),
     TaskResult(TaskResponse),
+    TaskError(TaskError),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -48,6 +49,13 @@ pub enum Operation {
     Add { a: i64, b: i64 },
     Multiply { a: i64, b: i64 },
     SumSquares { start: i64, end: i64 },
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TaskError {
+    pub task_id: u64,
+    pub worker: String,
+    pub error: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
