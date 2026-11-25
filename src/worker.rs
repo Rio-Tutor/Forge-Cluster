@@ -9,7 +9,7 @@ use crate::{
     compute,
     discovery,
     network,
-    protocol::{Message, TaskResponse, WorkerRegistration},
+    protocol::{Message, TaskError, TaskResponse, WorkerRegistration},
 };
 
 pub async fn run_worker(
@@ -159,17 +159,21 @@ async fn handle_connection(
 
     let response = match message {
         Message::RunTask(task) => {
-            let result = compute::execute(task.operation)
-                .map_err(std::io::Error::other)?;
-
-            Message::TaskResult(TaskResponse {
-                task_id: task.task_id,
-                result,
-                worker: "FORGE CPU Worker".to_string(),
-            })
+            match compute::execute(task.operation) {
+                Ok(result) => Message::TaskResult(TaskResponse {
+                    task_id: task.task_id,
+                    result,
+                    worker: "FORGE CPU Worker".to_string(),
+                }),
+                Err(error) => Message::TaskError(TaskError {
+                    task_id: task.task_id,
+                    worker: "FORGE CPU Worker".to_string(),
+                    error,
+                }),
+            }
         }
 
-        Message::TaskResult(_) => {
+        Message::TaskResult(_) | Message::TaskError(_) => {
             return Err(
                 "Worker received a result message instead of a task".into()
             );
