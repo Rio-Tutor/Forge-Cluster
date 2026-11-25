@@ -17,6 +17,8 @@ The current prototype includes IPv4 LAN master discovery, hardware profiling, wo
 - Worker heartbeats every 5 seconds and stale-worker removal after 20 seconds.
 - Worker re-registration when the master stops recognizing its heartbeat.
 - Per-task timeout and up to three attempts.
+- Structured task-failure responses and task-ID validation at the coordinator.
+- CPU backend unit tests for arithmetic, invalid ranges, and overflow.
 - Concurrent task dispatch and result aggregation.
 - Tested proof of concept with a Linux x86_64 PC and an Android ARM64 phone.
 - Vulkan adapter diagnostics for checking GPU runtime availability on each node.
@@ -125,7 +127,7 @@ Automatic master discovery is implemented using IPv4 UDP broadcast on the local 
 - Automatic IPv4 LAN master discovery is implemented. UDP broadcast may be blocked by some Wi-Fi networks.
 - Heartbeats and stale-worker expiry are implemented; reconnection to a master at a changed IP is not guaranteed.
 - The scheduler still uses fixed-size chunks; a startup CPU microbenchmark multiplied by logical core count influences assignment weights, but does not yet provide live adaptive scheduling.
-- Failed tasks are retried up to three attempts with a 20-second timeout. The demonstrated sum-of-squares operation is deterministic and safe to retry; future side-effecting operations will need task deduplication before retries can be generalized.
+- Failed tasks are retried up to three attempts with a 20-second timeout. Task responses are checked against the submitted task ID. The demonstrated sum-of-squares operation is deterministic and safe to retry; future side-effecting operations will need task deduplication before retries can be generalized.
 - Vulkan GPU adapter diagnostics are available through `forge gpu-info`. This confirms whether the runtime exposes a Vulkan adapter, but GPU task execution and GPU-aware scheduling are not implemented yet.
 - The current task set is small and experimental; `sum-squares` is the demonstrated distributed workload.
 - No authentication or encryption is implemented. Use only on a trusted, isolated network.
@@ -148,6 +150,16 @@ Issues and pull requests are welcome. The project is under active development, s
 
 Apache-2.0. See [LICENSE](LICENSE).
 
+
+## Backend tests
+
+Run the CPU backend unit tests with:
+
+```bash
+cargo test
+```
+
+The current tests cover arithmetic correctness, invalid sum-of-squares ranges, and overflow handling. They do not replace cross-device integration tests.
 
 ## GPU diagnostics
 
