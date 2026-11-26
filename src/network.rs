@@ -116,7 +116,9 @@ pub async fn run_master(
     // The master is also a compute node. It runs the same task server as
     // ordinary workers and registers its own hardware with the scheduler.
     let master_task_listener = TcpListener::bind("0.0.0.0:7878").await?;
-    let master_task_port = master_task_listener.local_addr()?.port();
+    let master_task_socket = master_task_listener.local_addr()?;
+    let master_task_port = master_task_socket.port();
+    println!("Master compute listener listening at: {master_task_socket}");
     let master_lan_ip = discovery::local_ipv4_address().await?;
     let master_task_address = format!("{master_lan_ip}:{master_task_port}");
     tokio::spawn(async move {
