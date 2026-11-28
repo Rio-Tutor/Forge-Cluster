@@ -90,6 +90,9 @@ async fn run_compute_smoke_test_async() -> Result<(), Box<dyn Error + Send + Syn
         .request_device(&wgpu::DeviceDescriptor::default())
         .await?;
 
+    println!("Selected GPU: {}", info.name);
+    println!("Preparing {ELEMENTS} vector elements...");
+
     let mut input_values = Vec::with_capacity((ELEMENTS * 2) as usize);
     for index in 0..ELEMENTS {
         input_values.push(index);
@@ -200,6 +203,7 @@ async fn run_compute_smoke_test_async() -> Result<(), Box<dyn Error + Send + Syn
         cache: None,
     });
 
+    let gpu_started = std::time::Instant::now();
     let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
         label: Some("FORGE vector-add encoder"),
     });
@@ -224,6 +228,7 @@ async fn run_compute_smoke_test_async() -> Result<(), Box<dyn Error + Send + Syn
     });
     device.poll(wgpu::PollType::wait_indefinitely())?;
     receiver.recv()??;
+    let gpu_round_trip = gpu_started.elapsed();
 
     let mapped = slice.get_mapped_range();
     let results: Vec<u32> = mapped
@@ -247,6 +252,7 @@ async fn run_compute_smoke_test_async() -> Result<(), Box<dyn Error + Send + Syn
     println!("Backend : {:?}", info.backend);
     println!("Elements: {ELEMENTS}");
     println!("Shader  : vector addition (WGSL)");
+    println!("GPU round-trip (dispatch + readback): {:.3} ms", gpu_round_trip.as_secs_f64() * 1000.0);
     println!("Result  : all values verified successfully");
 
     Ok(())
