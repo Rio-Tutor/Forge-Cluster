@@ -43,6 +43,10 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
             gpu::print_vulkan_adapters()?;
         }
 
+        Some("gpu-test") => {
+            gpu::run_compute_smoke_test()?;
+        }
+
         Some("master") => {
             let registration_bind = arguments
                 .get(2)
@@ -58,6 +62,8 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
             println!("Usage:");
             println!("  forge gpu-info");
             println!("    Detect available Vulkan GPU adapters.");
+            println!("  forge gpu-test");
+            println!("    Run and verify a small Vulkan compute shader.");
             println!("  forge master [registration-bind-ip:port]");
             println!("    Master commands: list | sum-squares <limit> <chunk-size> | quit");
             println!("  forge worker [bind-ip:port] [master-ip:port advertised-worker-ip:port]");
